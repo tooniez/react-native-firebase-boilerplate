@@ -23,6 +23,44 @@ describe('storage() -> StorageReference', function () {
       await seed(PATH);
     });
 
+    describe('second storage bucket writes to Storage emulator', function () {
+      let secondStorage;
+      // Same bucket defined in app.js when setting up emulator
+      const secondStorageBucket = 'gs://react-native-firebase-testing';
+
+      before(function () {
+        const { getStorage } = storageModular;
+        secondStorage = getStorage(firebase.app(), secondStorageBucket);
+      });
+
+      it('should write a file to the second storage bucket', async function () {
+        const { ref } = storageModular;
+
+        // "only-second-bucket" is not an allowable path on live project for either bucket
+        const storageReference = ref(secondStorage, 'only-second-bucket/ok.txt');
+
+        await storageReference.putString('Hello World');
+      });
+
+      it('should throw exception on path not allowed on second bucket security rules', async function () {
+        const { ref } = storageModular;
+
+        // "react-native-firebase-testing" is not an allowed on second bucket, only "ony-second-bucket"
+        const storageReference = ref(
+          secondStorage,
+          'react-native-firebase-testing/should-fail.txt',
+        );
+
+        try {
+          await storageReference.putString('Hello World');
+          return Promise.reject(new Error('Did not throw'));
+        } catch (error) {
+          error.code.should.equal('storage/unauthorized');
+          return Promise.resolve();
+        }
+      });
+    });
+
     describe('firebase v8 compatibility', function () {
       describe('toString()', function () {
         it('returns the correct bucket path to the file', function () {
@@ -109,9 +147,11 @@ describe('storage() -> StorageReference', function () {
             return Promise.reject(new Error('Did not throw'));
           } catch (error) {
             error.code.should.equal('storage/object-not-found');
-            error.message.should.equal(
-              '[storage/object-not-found] No object exists at the desired reference.',
-            );
+            if (!Platform.other) {
+              error.message.should.equal(
+                '[storage/object-not-found] No object exists at the desired reference.',
+              );
+            }
             return Promise.resolve();
           }
         });
@@ -124,9 +164,11 @@ describe('storage() -> StorageReference', function () {
             return Promise.reject(new Error('Did not throw'));
           } catch (error) {
             error.code.should.equal('storage/object-not-found');
-            error.message.should.equal(
-              '[storage/object-not-found] No object exists at the desired reference.',
-            );
+            if (!Platform.other) {
+              error.message.should.equal(
+                '[storage/object-not-found] No object exists at the desired reference.',
+              );
+            }
             return Promise.resolve();
           }
         });
@@ -139,9 +181,11 @@ describe('storage() -> StorageReference', function () {
             return Promise.reject(new Error('Did not throw'));
           } catch (error) {
             error.code.should.equal('storage/unauthorized');
-            error.message.should.equal(
-              '[storage/unauthorized] User is not authorized to perform the desired action.',
-            );
+            if (!Platform.other) {
+              error.message.should.equal(
+                '[storage/unauthorized] User is not authorized to perform the desired action.',
+              );
+            }
             return Promise.resolve();
           }
         });
@@ -168,9 +212,11 @@ describe('storage() -> StorageReference', function () {
             return Promise.reject(new Error('Did not throw'));
           } catch (error) {
             error.code.should.equal('storage/object-not-found');
-            error.message.should.equal(
-              '[storage/object-not-found] No object exists at the desired reference.',
-            );
+            if (!Platform.other) {
+              error.message.should.equal(
+                '[storage/object-not-found] No object exists at the desired reference.',
+              );
+            }
             return Promise.resolve();
           }
         });
@@ -182,9 +228,11 @@ describe('storage() -> StorageReference', function () {
             return Promise.reject(new Error('Did not throw'));
           } catch (error) {
             error.code.should.equal('storage/unauthorized');
-            error.message.should.equal(
-              '[storage/unauthorized] User is not authorized to perform the desired action.',
-            );
+            if (!Platform.other) {
+              error.message.should.equal(
+                '[storage/unauthorized] User is not authorized to perform the desired action.',
+              );
+            }
             return Promise.resolve();
           }
         });
@@ -196,7 +244,7 @@ describe('storage() -> StorageReference', function () {
           const metadata = await storageReference.getMetadata();
           metadata.generation.should.be.a.String();
           metadata.fullPath.should.equal(`${PATH}/list/file1.txt`);
-          if (Platform.android) {
+          if (Platform.android || Platform.other) {
             metadata.name.should.equal('file1.txt');
           } else {
             // FIXME on ios file comes through as fully-qualified
@@ -341,9 +389,11 @@ describe('storage() -> StorageReference', function () {
             return Promise.reject(new Error('listAll on a forbidden directory succeeded'));
           } catch (error) {
             error.code.should.equal('storage/unauthorized');
-            error.message.should.equal(
-              '[storage/unauthorized] User is not authorized to perform the desired action.',
-            );
+            if (!Platform.other) {
+              error.message.should.equal(
+                '[storage/unauthorized] User is not authorized to perform the desired action.',
+              );
+            }
             return Promise.resolve();
           }
         });
@@ -366,7 +416,7 @@ describe('storage() -> StorageReference', function () {
           // Things that are set automagically for us
           metadata.generation.should.be.a.String();
           metadata.fullPath.should.equal(`${PATH}/list/file1.txt`);
-          if (Platform.android) {
+          if (Platform.android || Platform.other) {
             metadata.name.should.equal('file1.txt');
           } else {
             // FIXME on ios file comes through as fully-qualified
@@ -402,7 +452,7 @@ describe('storage() -> StorageReference', function () {
           // Things that are set automagically for us and are not updatable
           metadata.generation.should.be.a.String();
           metadata.fullPath.should.equal(`${PATH}/list/file1.txt`);
-          if (Platform.android) {
+          if (Platform.android || Platform.other) {
             metadata.name.should.equal('file1.txt');
           } else {
             // FIXME on ios file comes through as fully-qualified
@@ -454,6 +504,7 @@ describe('storage() -> StorageReference', function () {
             contentType: 'application/octet-stream',
             customMetadata: {
               keepMe: 'please',
+              removeMeSecondTime: null,
             },
           });
           Object.keys(metadata.customMetadata).length.should.equal(1);
@@ -783,9 +834,11 @@ describe('storage() -> StorageReference', function () {
           return Promise.reject(new Error('Did not throw'));
         } catch (error) {
           error.code.should.equal('storage/object-not-found');
-          error.message.should.equal(
-            '[storage/object-not-found] No object exists at the desired reference.',
-          );
+          if (!Platform.other) {
+            error.message.should.equal(
+              '[storage/object-not-found] No object exists at the desired reference.',
+            );
+          }
           return Promise.resolve();
         }
       });
@@ -799,9 +852,11 @@ describe('storage() -> StorageReference', function () {
           return Promise.reject(new Error('Did not throw'));
         } catch (error) {
           error.code.should.equal('storage/object-not-found');
-          error.message.should.equal(
-            '[storage/object-not-found] No object exists at the desired reference.',
-          );
+          if (!Platform.other) {
+            error.message.should.equal(
+              '[storage/object-not-found] No object exists at the desired reference.',
+            );
+          }
           return Promise.resolve();
         }
       });
@@ -815,9 +870,11 @@ describe('storage() -> StorageReference', function () {
           return Promise.reject(new Error('Did not throw'));
         } catch (error) {
           error.code.should.equal('storage/unauthorized');
-          error.message.should.equal(
-            '[storage/unauthorized] User is not authorized to perform the desired action.',
-          );
+          if (!Platform.other) {
+            error.message.should.equal(
+              '[storage/unauthorized] User is not authorized to perform the desired action.',
+            );
+          }
           return Promise.resolve();
         }
       });
@@ -847,9 +904,11 @@ describe('storage() -> StorageReference', function () {
           return Promise.reject(new Error('Did not throw'));
         } catch (error) {
           error.code.should.equal('storage/object-not-found');
-          error.message.should.equal(
-            '[storage/object-not-found] No object exists at the desired reference.',
-          );
+          if (!Platform.other) {
+            error.message.should.equal(
+              '[storage/object-not-found] No object exists at the desired reference.',
+            );
+          }
           return Promise.resolve();
         }
       });
@@ -863,9 +922,11 @@ describe('storage() -> StorageReference', function () {
           return Promise.reject(new Error('Did not throw'));
         } catch (error) {
           error.code.should.equal('storage/unauthorized');
-          error.message.should.equal(
-            '[storage/unauthorized] User is not authorized to perform the desired action.',
-          );
+          if (!Platform.other) {
+            error.message.should.equal(
+              '[storage/unauthorized] User is not authorized to perform the desired action.',
+            );
+          }
           return Promise.resolve();
         }
       });
@@ -878,7 +939,7 @@ describe('storage() -> StorageReference', function () {
         const metadata = await getMetadata(storageReference);
         metadata.generation.should.be.a.String();
         metadata.fullPath.should.equal(`${PATH}/list/file1.txt`);
-        if (Platform.android) {
+        if (Platform.android || Platform.other) {
           metadata.name.should.equal('file1.txt');
         } else {
           // FIXME on ios file comes through as fully-qualified
@@ -1049,9 +1110,11 @@ describe('storage() -> StorageReference', function () {
           return Promise.reject(new Error('listAll on a forbidden directory succeeded'));
         } catch (error) {
           error.code.should.equal('storage/unauthorized');
-          error.message.should.equal(
-            '[storage/unauthorized] User is not authorized to perform the desired action.',
-          );
+          if (!Platform.other) {
+            error.message.should.equal(
+              '[storage/unauthorized] User is not authorized to perform the desired action.',
+            );
+          }
           return Promise.resolve();
         }
       });
@@ -1077,7 +1140,7 @@ describe('storage() -> StorageReference', function () {
         // Things that are set automagically for us
         metadata.generation.should.be.a.String();
         metadata.fullPath.should.equal(`${PATH}/list/file1.txt`);
-        if (Platform.android) {
+        if (Platform.android || Platform.other) {
           metadata.name.should.equal('file1.txt');
         } else {
           // FIXME on ios file comes through as fully-qualified
@@ -1116,7 +1179,7 @@ describe('storage() -> StorageReference', function () {
         // Things that are set automagically for us and are not updatable
         metadata.generation.should.be.a.String();
         metadata.fullPath.should.equal(`${PATH}/list/file1.txt`);
-        if (Platform.android) {
+        if (Platform.android || Platform.other) {
           metadata.name.should.equal('file1.txt');
         } else {
           // FIXME on ios file comes through as fully-qualified
@@ -1175,6 +1238,7 @@ describe('storage() -> StorageReference', function () {
           contentType: 'application/octet-stream',
           customMetadata: {
             keepMe: 'please',
+            removeMeSecondTime: null,
           },
         });
 

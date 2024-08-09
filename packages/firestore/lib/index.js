@@ -24,6 +24,7 @@ import {
   isUndefined,
   isAndroid,
 } from '@react-native-firebase/app/lib/common';
+import { setReactNativeModule } from '@react-native-firebase/app/lib/internal/nativeModule';
 import {
   createModuleNamespace,
   FirebaseModule,
@@ -38,6 +39,7 @@ import FirestoreStatics from './FirestoreStatics';
 import FirestoreTransactionHandler from './FirestoreTransactionHandler';
 import FirestoreWriteBatch from './FirestoreWriteBatch';
 import version from './version';
+import fallBackModule from './web/RNFBFirestoreModule';
 
 const namespace = 'firestore';
 
@@ -55,8 +57,13 @@ const nativeEvents = [
 ];
 
 class FirebaseFirestoreModule extends FirebaseModule {
-  constructor(app, config) {
+  constructor(app, config, databaseId) {
     super(app, config);
+    if (isString(databaseId) || databaseId === undefined) {
+      this._customUrlOrRegion = databaseId || '(default)';
+    } else if (!isString(databaseId)) {
+      throw new Error('firebase.app().firestore(*) database ID must be a string');
+    }
     this._referencePath = new FirestorePath();
     this._transactionHandler = new FirestoreTransactionHandler(this);
 
@@ -78,6 +85,10 @@ class FirebaseFirestoreModule extends FirebaseModule {
     this._settings = {
       ignoreUndefinedProperties: false,
     };
+  }
+  // We override the FirebaseModule's `eventNameForApp()` method to include the customUrlOrRegion
+  eventNameForApp(...args) {
+    return `${this.app.name}-${this._customUrlOrRegion}-${args.join('-')}`;
   }
 
   batch() {
@@ -370,7 +381,7 @@ export default createModuleNamespace({
   nativeModuleName,
   nativeEvents,
   hasMultiAppSupport: true,
-  hasCustomUrlOrRegionSupport: false,
+  hasCustomUrlOrRegionSupport: true,
   ModuleClass: FirebaseFirestoreModule,
 });
 
@@ -378,3 +389,8 @@ export default createModuleNamespace({
 // firestore().X(...);
 // firebase.firestore().X(...);
 export const firebase = getFirebaseRoot();
+
+// Register the interop module for non-native platforms.
+for (let i = 0; i < nativeModuleName.length; i++) {
+  setReactNativeModule(nativeModuleName[i], fallBackModule);
+}
